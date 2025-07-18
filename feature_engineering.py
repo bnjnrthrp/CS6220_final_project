@@ -1,36 +1,28 @@
+# pip install lxml yfinance
+
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
+from config import *
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# -----------------------------------------------------------------------------
-# CONFIGURATION
-# -----------------------------------------------------------------------------
-# Save outputs *next to this script*, regardless of where you launch Python
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(SCRIPT_DIR, "data")  # <project_root>/data
 
-DEFAULT_LOOKBACK_YEARS = 5  # how many years of history to pull
-BATCH_SIZE = 50             # tickers per Yahoo batch (avoid throttling)
-REQUEST_PAUSE = 2           # seconds between batches (API‑friendly)
-
-pd.options.mode.copy_on_write = True  # pandas 2 speed‑up, safe for our usage
 
 # -----------------------------------------------------------------------------
 # DATA COLLECTION HELPERS
 # -----------------------------------------------------------------------------
 
 def get_sp500_tickers() -> List[str]:
-    """Return today’s S&P 500 membership with symbols formatted for Yahoo.
+    """Return today's S&P 500 membership with symbols formatted for Yahoo.
 
     Yahoo Finance uses *hyphens* for class shares (e.g. ``BRK-B``) whereas the
-    Wikipedia table lists them with dots (``BRK.B``).  Rather than hard‑coding
+    Wikipedia table lists them with dots (``BRK.B``).  Rather than hard-coding
     specific exceptions, we simply replace any dot with a hyphen so the script
-    automatically adapts to future dot‑class tickers without manual edits.
+    automatically adapts to future dot-class tickers without manual edits.
     """
 
     table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")[0]
@@ -46,10 +38,10 @@ EMA = lambda s, span: s.ewm(span=span, adjust=False).mean()
 
 
 def multistock_df(raw: pd.DataFrame) -> pd.DataFrame:
-    """Convert *yfinance*’s wide multi‑column frame into long format.
+    """Convert *yfinance*'s wide multi-column frame into long format.
 
-    After stacking level‑0 (ticker) we get an index (Date, Ticker) and columns
-    for OHLCV fields.  Works for single‑ticker frames as well by normalising
+    After stacking level-0 (ticker) we get an index (Date, Ticker) and columns
+    for OHLCV fields.  Works for single-ticker frames as well by normalising
     the column layout first.
     """
 
@@ -67,7 +59,8 @@ def multistock_df(raw: pd.DataFrame) -> pd.DataFrame:
 def fetch_history(tickers: List[str], years: int = DEFAULT_LOOKBACK_YEARS) -> pd.DataFrame:
     """Download historical daily prices for *tickers* and return a tidy frame."""
 
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc)
+        
     start = end - timedelta(days=365 * years + 5)
 
     frames = []
@@ -92,14 +85,14 @@ def fetch_history(tickers: List[str], years: int = DEFAULT_LOOKBACK_YEARS) -> pd
         time.sleep(REQUEST_PAUSE)
 
     if not frames:
-        raise RuntimeError("No price data downloaded – check ticker list / network.")
+        raise RuntimeError("No price data downloaded - check ticker list / network.")
 
     df = pd.concat(frames)
 
     # Ensure Adj Close exists (fallback to Close).
     if "Adj Close" not in df.columns:
         if "Close" not in df.columns:
-            raise RuntimeError("Downloaded data lacks both Adj Close and Close.")
+            raise RuntimeError("Downloaded data lacks both Adj Close and Close.")
         df["Adj Close"] = df["Close"]
 
     return df[["Adj Close"]].dropna()
@@ -165,18 +158,18 @@ def engineer_features(df_raw: pd.DataFrame) -> pd.DataFrame:
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    print("[INFO] Retrieving S&P 500 ticker list …")
+    print("[INFO] Retrieving S&P 500 ticker list...")
     tickers = get_sp500_tickers()
 
-    print(f"[INFO] Downloading {DEFAULT_LOOKBACK_YEARS}y of price data for {len(tickers)} tickers …")
+    print(f"[INFO] Downloading {DEFAULT_LOOKBACK_YEARS}y of price data for {len(tickers)} tickers...")
     df_raw = fetch_history(tickers)
 
-    print("[INFO] Engineering features …")
+    print("[INFO] Engineering features...")
     df_feat = engineer_features(df_raw)
 
     out_path = os.path.join(OUTPUT_DIR, "sp500_features.csv")
-    df_feat.to_csv(out_path)
-    print(f"[DONE] Feature matrix saved ➜ {out_path} (rows: {len(df_feat):,})")
+    df_feat.to_csv(out_path, encoding='utf-8')
+    print(f"[DONE] Feature matrix saved -> {out_path} (rows: {len(df_feat):,})")
 
 
 if __name__ == "__main__":
