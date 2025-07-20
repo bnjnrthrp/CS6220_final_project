@@ -54,8 +54,26 @@ sns.set_style("whitegrid")
 def load_data():
     """Load the enriched dataset with PCA and clustering features"""
     input_path = os.path.join(OUTPUT_DIR, "pca_features.parquet")
-    df = pd.read_parquet(input_path)
-    return df
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(
+            "\nERROR: PCA features file not found at: {}"
+            "\n\nThis module requires the output from pca_baseline.py."
+            "\nPlease ensure:"
+            "\n1. The data/ directory exists"
+            "\n2. pca_baseline.py has been run"
+            "\n3. pca_features.parquet was generated successfully"
+            .format(input_path)
+        )
+    
+    try:
+        df = pd.read_parquet(input_path)
+        return df
+    except Exception as e:
+        raise Exception(
+            "\nError reading PCA features file: {}"
+            "\nPlease ensure pca_baseline.py completed successfully."
+            .format(str(e))
+        )
 
 def create_model():
     """Create the MLPClassifier model"""
