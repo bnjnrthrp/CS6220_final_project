@@ -102,7 +102,7 @@ def fetch_history(tickers: List[str], years: int = DEFAULT_LOOKBACK_YEARS) -> pd
 # FEATURE ENGINEERING
 # -----------------------------------------------------------------------------
 
-def add_simple_returns(df: pd.DataFrame, horizons=(1, 5, 20, 60, 120)) -> pd.DataFrame:
+def add_simple_returns(df: pd.DataFrame, horizons=(1, 2, 3, 4, 5, 20, 60, 120)) -> pd.DataFrame:
     for h in horizons:
         df[f"Ret_{h}d"] = df.groupby("Ticker")["Adj Close"].pct_change(periods=h, fill_method=None)
     return df

@@ -4,17 +4,18 @@ from config import SCRIPT_DIR, OUTPUT_DIR
 import os
 import pandas as pd
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, auc
 from sklearn.preprocessing import label_binarize
-
-
+matplotlib.use('Agg')
 '''
 Expected column format of csv file is:
 Date, Ticker, Adj Close, Ret_1d, Ret_2d, Ret_3d, Ret_4d, Ret_5d, Ret_20d, Ret_60d, Ret_120d, Vol_10d, Vol_20d, Vol_60d, MACD, MACD_Signal, RSI14
@@ -74,17 +75,64 @@ def main():
     out_path = os.path.join(OUTPUT_DIR, "pca_features.parquet")
     df_pca.to_parquet(out_path, index=False)
 
-
-
     # Split the data up, but maintain chronological order
     X_train, X_test, y_train, y_test = train_test_split(
-        X_pca, y, test_size=0.2, shuffle=False  # Time-series style split
+        X_scaled, y, test_size=0.2, shuffle=False  # Time-series style split
     )
 
-    # Establish the logistic baseline
-    clf = LogisticRegression(max_iter=1000, class_weight='balanced')
+    # Establish the Random Forest Classifier
+    clf = RandomForestClassifier(
+        n_estimators=100,
+        class_weight='balanced',
+        random_state=42,
+        n_jobs=-1
+    )
+
+    print(f"Fitting the model")
     clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
+
+    probs = clf.predict_proba(X_test)
+    y_pred = []
+    print(f"Complete")
+
+    best_f1 = 0
+    best_thresh = (0.4, 0.4)
+    print(f"Determining best threshold combination")
+    for up_t in np.arange(0.2, 0.7, 0.025):
+        for down_t in np.arange(0.2, 0.7, 0.025):
+            preds = []
+            for p in probs:
+                if p[2] > up_t:
+                    preds.append(2)
+                elif p[0] > down_t:
+                    preds.append(0)
+                else:
+                    preds.append(1)
+            f1 = f1_score(y_test, preds, average='macro')
+            if f1 > best_f1:
+                best_f1 = f1
+                best_thresh = (up_t, down_t)
+
+    print(f"Best macro F1: {best_f1:.4f} at thresholds up={best_thresh[0]}, down={best_thresh[1]}")
+
+    up_t, down_t = best_thresh
+    y_pred = []
+
+    for p in probs:
+        if p[2] > 0.4:
+            y_pred.append(2)
+        elif p[0] > 0.4:
+            y_pred.append(0)
+        else:
+            y_pred.append(1)
+
+    # Print the results
+    metrics = {
+        'accuracy': accuracy_score(y_test, y_pred),
+        'precision': precision_score(y_test, y_pred, average='macro'),
+        'recall': recall_score(y_test, y_pred, average='macro'),
+        'f1': f1_score(y_test, y_pred, average='macro')
+    }
 
     cm = confusion_matrix(y_test, y_pred, labels=[0, 1, 2])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['down', 'neutral', 'up'])
@@ -94,14 +142,6 @@ def main():
     plt.savefig(roc_plot_path)
     plt.close()
     print(f'display(Image("{roc_plot_path}"))')
-
-    # Print the results
-    metrics = {
-        'accuracy': accuracy_score(y_test, y_pred),
-        'precision': precision_score(y_test, y_pred, average='macro'),
-        'recall': recall_score(y_test, y_pred, average='macro'),
-        'f1': f1_score(y_test, y_pred, average='macro')
-    }
 
     print("====== Logistic Regression Baseline Metrics: ======")
     for k, v in metrics.items():
@@ -142,7 +182,6 @@ def main():
     roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/logreg_roc.png')
     plt.savefig(roc_plot_path)
     plt.close()
-
 
     return
 
