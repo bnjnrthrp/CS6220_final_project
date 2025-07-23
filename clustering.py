@@ -4,7 +4,7 @@ clustering.py
 
 Loads PCA‑transformed features, performs K‑Means and Agglomerative clustering,
 reports silhouette & Davies‑Bouldin scores, and saves the data with a
-`cluster_label` column to `data/cluster.csv`.
+`cluster_label` column to `data/cluster.parquet`.
 
 Call ``from clustering import run`` inside pipeline.ipynb.
 """
@@ -23,8 +23,8 @@ import seaborn as sns
 # ---------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPT_DIR / "data"
-IN_PATH = DATA_DIR / "pca_features.csv"
-OUT_PATH = DATA_DIR / "cluster.csv"
+IN_PATH = DATA_DIR / "pca_features.parquet"
+OUT_PATH = DATA_DIR / "cluster.parquet"
 PLOT_DIR = SCRIPT_DIR / "figures"
 PLOT_DIR.mkdir(exist_ok=True)
 
@@ -68,7 +68,7 @@ def run():
     if not IN_PATH.exists():
         raise FileNotFoundError(f"PCA file not found at {IN_PATH}")
 
-    df = pd.read_csv(IN_PATH)
+    df = pd.read_parquet(IN_PATH)
     X = df.drop(columns=["label"]).values  # keep any label col for later
 
     if len(X) > 25_000:
@@ -126,7 +126,7 @@ def run():
     # 5. Save enriched data
     # -----------------------------------------------------------------
     df["cluster_label"] = km_labels
-    df.to_csv(OUT_PATH, index=False)
+    df.to_parquet(OUT_PATH, index=False)
 
     metrics = {
         "k_chosen": int(k_chosen),
