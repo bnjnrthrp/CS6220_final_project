@@ -55,10 +55,10 @@ All plots are written to figures/ and auto‑displayed in the notebook:
 
 ## 5 Contributors
 
-### Name                                Role
+### Name & Role
 
-Benjamin Northrop                   Data acquisition & cluster analysis
+Benjamin Northrop:                   Data acquisition & cluster analysis
 
-Carlos Semeho Edorh                 PCA & classification benchmarks
+Carlos Semeho Edorh:                 PCA & classification benchmarks
 
-Zachary Coates                      Feature engineering & MLP pipeline
+Zachary Coates:                      Feature engineering & MLP pipeline
