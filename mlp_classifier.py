@@ -5,7 +5,7 @@ This module builds upon the clustered features to predict significant stock pric
 The workflow is as follows:
 
 1. Data Input:
-   - Reads the clustered features from 'cluster.csv'
+   - Reads the clustered features from 'cluster.parquet'
    - Features include both PCA components and cluster assignments
 
 2. Target Creation:
@@ -57,25 +57,25 @@ sns.set_style("whitegrid")
 
 def load_data():
     """Load the enriched dataset with PCA and clustering features"""
-    input_path = os.path.join(OUTPUT_DIR, "cluster.csv")
+    input_path = os.path.join(OUTPUT_DIR, "cluster.parquet")
     
     if not os.path.exists(input_path):
         raise FileNotFoundError(
             "\nERROR: Cluster features file not found at: {}"
-            "\n\nThis module requires the cluster.csv file."
+            "\n\nThis module requires the cluster.parquet file."
             "\nPlease ensure:"
             "\n1. The data/ directory exists"
-            "\n2. The cluster.csv file has been provided"
+            "\n2. The cluster.parquet file has been provided"
             .format(input_path)
         )
     
     try:
-        df = pd.read_csv(input_path)
+        df = pd.read_parquet(input_path)
         return df
     except Exception as e:
         raise Exception(
             "\nError reading cluster features file: {}"
-            "\nPlease ensure cluster.csv is valid: {}"
+            "\nPlease ensure cluster.parquet is valid: {}"
             .format(str(e))
         )
 
@@ -92,7 +92,7 @@ def create_model():
         early_stopping=True,
         validation_fraction=0.2,
         n_iter_no_change=10,
-        verbose=True
+        verbose=False
     )
 
 def evaluate_model(y_true, y_pred, y_pred_proba=None):
@@ -208,11 +208,11 @@ def save_results(metrics, report, model, X_test, y_test, y_pred, model_info=None
     
     # Save metrics
     metrics_df = pd.DataFrame([metrics])
-    metrics_df.to_csv(os.path.join(output_folder, "metrics.csv"), index=False)
+    metrics_df.to_parquet(os.path.join(output_folder, "metrics.parquet"), index=False)
     
     # Save classification report
     report_df = pd.DataFrame(report).transpose()
-    report_df.to_csv(os.path.join(output_folder, "classification_report.csv"))
+    report_df.to_parquet(os.path.join(output_folder, "classification_report.parquet"))
     
     # Save predictions with probabilities
     predictions_df = pd.DataFrame({
@@ -220,7 +220,7 @@ def save_results(metrics, report, model, X_test, y_test, y_pred, model_info=None
         'predicted': y_pred,
         'probability': model.predict_proba(X_test)[:, 1]
     })
-    predictions_df.to_csv(os.path.join(output_folder, "predictions.csv"), index=False)
+    predictions_df.to_parquet(os.path.join(output_folder, "predictions.parquet"), index=False)
     
     # Save model parameters
     params = {
@@ -235,7 +235,7 @@ def save_results(metrics, report, model, X_test, y_test, y_pred, model_info=None
         'validation_fraction': model.validation_fraction,
         'n_iter_no_change': model.n_iter_no_change
     }
-    pd.DataFrame([params]).to_csv(os.path.join(output_folder, "model_parameters.csv"), index=False)
+    pd.DataFrame([params]).to_parquet(os.path.join(output_folder, "model_parameters.parquet"), index=False)
     
     # Initialize plot paths
     plot_paths = {}
@@ -291,45 +291,38 @@ def train_and_evaluate():
     """Main function to train and evaluate the MLP model"""
     print("Loading and preparing data...")
     df = load_data()
-    
-    # Display dataset info
-    print("\nDataset Overview:")
-    print("-" * 50)
-    print(f"Shape: {df.shape}")
-    print(f"Number of features: {df.shape[1] - 1}")
-    print(f"Number of samples: {df.shape[0]}")
-    print(f"Time period coverage: {df.shape[0] // 500:.1f} trading days")
 
-    # Show label distribution
-    dist = df['label'].value_counts(normalize=True)
-    print("\nClass distribution:")
-    print(f"  Big negative moves (<-1.5%): {dist.get(0, 0):.1%}")
-    print(f"  Small/No moves (-1.5% to 1.5%): {dist.get(1, 0):.1%}")
-    print(f"  Big positive moves (>1.5%): {dist.get(2, 0):.1%}")
-    
-    # Prepare features and target
-    X = df.drop(['label', 'cluster_label'], axis=1)  # Drop both label columns
-    # Convert multi-class to binary (1 for up, 0 for down/neutral)
-    y = (df['label'] == 2).astype(int)
-    
-    # Split data chronologically
+    # Dataset overview
+    print(f"Shape: {df.shape}")
+    dist = df["label"].value_counts(normalize=True)
+    print(
+        f"Class distribution 0/1/2 → "
+        f"{dist.get(0,0):.1%} / {dist.get(1,0):.1%} / {dist.get(2,0):.1%}"
+    )
+
+    # ------------------------------------------------------------------ #
+    # 1) Build feature matrix & target
+    # ------------------------------------------------------------------ #
+    X = df.drop(["label", "cluster_label"], axis=1)
+    y = (df["label"] == 2).astype(int)          # 1 = up, 0 = down or neutral
+
+    # Chronological 80 / 20 split
     split_idx = int(len(X) * 0.8)
-    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-    
-    print("\nTraining set shape:", X_train.shape)
-    print("Test set shape:", X_test.shape)
-    
-    print("\nCreating and training MLP model...")
+    X_train, X_test  = X.iloc[:split_idx],  X.iloc[split_idx:]
+    y_train, y_test  = y.iloc[:split_idx],  y.iloc[split_idx:]
+
+    # Now the shapes exist → safe to print
+    print(f"Train/Test split: {X_train.shape}  /  {X_test.shape}")
+
+    # ------------------------------------------------------------------ #
+    # 2) Model
+    # ------------------------------------------------------------------ #
+    print("\nCreating and training MLP model…")
     model = create_model()
-    
-    # Train the model
     model.fit(X_train, y_train)
-    
-    # Generate predictions
-    y_pred = model.predict(X_test)
-    
-    # Calculate metrics
+
+    # Predictions & metrics
+    y_pred  = model.predict(X_test)
     metrics, report = evaluate_model(y_test, y_pred)
     
     # Collect model info and training history
@@ -390,11 +383,6 @@ def train_and_evaluate():
     for metric, value in metrics.items():
         print(f"{metric:>10}: {value:.4f}")
     
-    print("\nDetailed Classification Report:")
-    print("-" * 50)
-    print(report)
-    
-    print("\nAll results have been saved to the data directory.")
     
     return metrics, report, final_plot_paths
 
