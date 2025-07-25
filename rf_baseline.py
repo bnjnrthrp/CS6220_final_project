@@ -40,9 +40,6 @@ def main():
     df.loc[df['Ret_1d'] > 0.015, 'label'] = 2  # big positive move
     df.loc[df['Ret_1d'] < -0.015, 'label'] = 0  # big negative move
 
-    print(f"Label distribution:\n{df['label'].value_counts(normalize=True)}")    
-
-
     # Separate the feature set and the target, prepare for PCA analysis
     X = df.drop(columns=drop_cols)
     y = df['label'].values
@@ -63,10 +60,9 @@ def main():
     plt.title("PCA Explained Variance")
     plt.legend()
     os.makedirs(os.path.join(SCRIPT_DIR, 'figures'), exist_ok=True)
-    pca_plot_path = os.path.join(SCRIPT_DIR, 'figures/pca_variance.png')
+    pca_plot_path = os.path.join(SCRIPT_DIR, 'figures/randomforest_pca_variance.png')
     plt.savefig(pca_plot_path)
     plt.close()
-    print(f'display(Image("{pca_plot_path}"))')
 
     # Save PCA-transformed features
     df_pca = pd.DataFrame(X_pca)
@@ -88,16 +84,16 @@ def main():
         n_jobs=-1
     )
 
-    print(f"Fitting the model")
+    print(f"[INFO] Fitting the model")
     clf.fit(X_train, y_train)
 
     probs = clf.predict_proba(X_test)
     y_pred = []
-    print(f"Complete")
+    print(f"[INFO] Complete")
 
     best_f1 = 0
     best_thresh = (0.4, 0.4)
-    print(f"Determining best threshold combination")
+    print(f"[INFO] Determining best threshold combination")
     for up_t in np.arange(0.2, 0.7, 0.025):
         for down_t in np.arange(0.2, 0.7, 0.025):
             preds = []
@@ -113,7 +109,7 @@ def main():
                 best_f1 = f1
                 best_thresh = (up_t, down_t)
 
-    print(f"Best macro F1: {best_f1:.4f} at thresholds up={best_thresh[0]}, down={best_thresh[1]}")
+    print(f"[INFO] Best macro F1: {best_f1:.4f} at thresholds up={best_thresh[0]}, down={best_thresh[1]}")
 
     up_t, down_t = best_thresh
     y_pred = []
@@ -137,13 +133,12 @@ def main():
     cm = confusion_matrix(y_test, y_pred, labels=[0, 1, 2])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['down', 'neutral', 'up'])
     disp.plot(cmap=plt.cm.Blues)
-    plt.title("Logistic Regression Confusion Matrix")
-    roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/logreg_roc.png')
-    plt.savefig(roc_plot_path)
+    plt.title("Random Forest Confusion Matrix")
+    cm_path = os.path.join(SCRIPT_DIR, 'figures/randomforest_confusion_matrix.png')
+    plt.savefig(cm_path)
     plt.close()
-    print(f'display(Image("{roc_plot_path}"))')
 
-    print("====== Logistic Regression Baseline Metrics: ======")
+    print("====== Random Forest Baseline Metrics: ======")
     for k, v in metrics.items():
         print(f"{k:>10}: {v:.4f}")
 
@@ -176,14 +171,19 @@ def main():
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('One-vs-Rest ROC Curve (Logistic Regression)')
+    plt.title('One-vs-Rest ROC Curve (Random Forest)')
     plt.legend(loc="lower right")
-
-    roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/logreg_roc.png')
+    roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/randomforest_logreg_roc.png')
     plt.savefig(roc_plot_path)
     plt.close()
 
-    return
+    plots = {
+        "pca_variance": str(pca_plot_path),
+        "confusion_matrix": str(cm_path),
+        "logreg_roc": str(roc_plot_path)
+    }
+
+    return plots
 
 # Allow running as script or import
 if __name__ == "__main__":
