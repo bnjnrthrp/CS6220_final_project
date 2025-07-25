@@ -39,9 +39,6 @@ def main():
     df.loc[df['Ret_1d'] > 0.015, 'label'] = 2  # big positive move
     df.loc[df['Ret_1d'] < -0.015, 'label'] = 0  # big negative move
 
-    print(f"Label distribution:\n{df['label'].value_counts(normalize=True)}")    
-
-
     # Separate the feature set and the target, prepare for PCA analysis
     X = df.drop(columns=drop_cols)
     y = df['label'].values
@@ -65,7 +62,6 @@ def main():
     pca_plot_path = os.path.join(SCRIPT_DIR, 'figures/pca_variance.png')
     plt.savefig(pca_plot_path)
     plt.close()
-    print(f'display(Image("{pca_plot_path}"))')
 
     # Save PCA-transformed features
     df_pca = pd.DataFrame(X_pca)
@@ -73,8 +69,6 @@ def main():
 
     out_path = os.path.join(OUTPUT_DIR, "pca_features.parquet")
     df_pca.to_parquet(out_path, index=False)
-
-
 
     # Split the data up, but maintain chronological order
     X_train, X_test, y_train, y_test = train_test_split(
@@ -90,11 +84,9 @@ def main():
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['down', 'neutral', 'up'])
     disp.plot(cmap=plt.cm.Blues)
     plt.title("Logistic Regression Confusion Matrix")
-    roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/logreg_roc.png')
-    plt.savefig(roc_plot_path)
+    cm_path = os.path.join(SCRIPT_DIR, 'figures/confusion_matrix.png')
+    plt.savefig(cm_path)
     plt.close()
-    print(f'display(Image("{roc_plot_path}"))')
-
     # Print the results
     metrics = {
         'accuracy': accuracy_score(y_test, y_pred),
@@ -141,10 +133,15 @@ def main():
 
     roc_plot_path = os.path.join(SCRIPT_DIR, 'figures/logreg_roc.png')
     plt.savefig(roc_plot_path)
-    plt.close()
+    plt.close() 
 
+    plots = {
+        "pca_variance": str(pca_plot_path),
+        "confusion_matrix": str(cm_path),
+        "logreg_roc": str(roc_plot_path)
+    }
 
-    return
+    return plots
 
 # Allow running as script or import
 if __name__ == "__main__":
