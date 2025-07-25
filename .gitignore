@@ -4,7 +4,7 @@
 /data/*.csv
 /figures/*.png
 .DS_Store
-
+*.docx
 
 # Python cache files
 __pycache__/
