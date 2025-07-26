@@ -57,8 +57,8 @@ All plots are written to figures/ and auto‑displayed in the notebook:
 
 ### Name & Role
 
-Benjamin Northrop:                   Data acquisition & cluster analysis
+Benjamin Northrop:              PCA & Logistic regression baseline
 
-Carlos Semeho Edorh:                 PCA & classification benchmarks
+Carlos Semeho Edorh:            MLP neural network classifier & Evaluation
 
-Zachary Coates:                      Feature engineering & MLP pipeline
+Zachary Coates:                 Feature engineering & Clustering pipelineining
