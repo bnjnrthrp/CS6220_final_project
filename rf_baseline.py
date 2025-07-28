@@ -115,9 +115,9 @@ def main():
     y_pred = []
 
     for p in probs:
-        if p[2] > 0.4:
+        if p[2] > up_t :
             y_pred.append(2)
-        elif p[0] > 0.4:
+        elif p[0] > down_t:
             y_pred.append(0)
         else:
             y_pred.append(1)
